@@ -1,0 +1,6 @@
+{
+  "name": "LeadHero - Full Stack Lead Management Platform",
+  "description": "Production-grade lead management platform with role-based auth (Admin & Member), lead lifecycle, activity trail, REST API, test runner, Task B audit refactor, and Loom walkthrough for Digital Heroes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
