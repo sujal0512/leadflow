@@ -4,10 +4,10 @@ import { Lead, LeadActivity, LeadNote, LeadService, LeadStatus, PipelineStats, U
 export const INITIAL_USERS: User[] = [
   {
     id: 'usr_admin_1',
-    name: 'Priya Sharma',
-    email: 'priya@leadtracker.app',
+    name: 'Sujal Das',
+    email: 'Sujal.das8797@gmail.com',
     role: 'admin',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    avatar: 'https://kommodo.ai/i/39Vh61G4xzFg3t1OpWed',
     title: 'Head of Sales & Growth',
     active: true,
   },
