@@ -20,7 +20,8 @@ import {
   Sparkles,
   ArrowUpDown,
   AlertCircle,
-  Download
+  Download,
+  Upload
 } from 'lucide-react';
 import { Lead, LeadService, LeadStatus, PipelineStats, User } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -216,6 +217,62 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
     }
   };
 
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      const text = await file.text();
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length <= 1) {
+        alert('CSV file is empty or missing data rows');
+        return;
+      }
+
+      // We expect simple headers or we just parse by position:
+      // Name, Email, Company, Phone, Service, Budget
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      
+      const nameIdx = headers.findIndex(h => h.includes('name'));
+      const emailIdx = headers.findIndex(h => h.includes('email'));
+      const companyIdx = headers.findIndex(h => h.includes('company'));
+      const phoneIdx = headers.findIndex(h => h.includes('phone'));
+      const budgetIdx = headers.findIndex(h => h.includes('budget'));
+      
+      let importedCount = 0;
+      for (let i = 1; i < lines.length; i++) {
+        // Very basic CSV parsing splitting by comma (ignoring quotes for simplicity in this basic demo)
+        const row = lines[i].split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+        if (row.length < 2) continue;
+        
+        const newLead = {
+          name: nameIdx !== -1 ? row[nameIdx] : `Lead ${i}`,
+          email: emailIdx !== -1 ? row[emailIdx] : `unknown${i}@example.com`,
+          company: companyIdx !== -1 ? row[companyIdx] : `Company ${i}`,
+          phone: phoneIdx !== -1 ? row[phoneIdx] : '',
+          service: 'web_dev' as any,
+          budget: budgetIdx !== -1 ? parseInt(row[budgetIdx], 10) || 5000 : 5000,
+          status: 'new' as any,
+        };
+        
+        await api.createLead(newLead);
+        importedCount++;
+      }
+      
+      alert(`Successfully imported ${importedCount} leads!`);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred during import');
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const getHexColor = (barColor: string) => {
     if (barColor.includes('sky')) return '#0ea5e9';
     if (barColor.includes('blue')) return '#3b82f6';
@@ -343,6 +400,23 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
                 <span>Table View</span>
               </button>
             </div>
+
+            <input 
+              type="file" 
+              accept=".csv" 
+              ref={fileInputRef} 
+              onChange={handleImportCSV} 
+              className="hidden" 
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2 rounded-xl border border-slate-700 transition"
+              title="Import leads from CSV"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Import CSV</span>
+            </button>
 
             <button
               onClick={handleExportCSV}
