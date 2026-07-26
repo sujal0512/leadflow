@@ -22,6 +22,7 @@ interface NavbarProps {
   onSwitchUser: (role: 'admin' | 'member', userId?: string) => void;
   onResetDb: () => void;
   onOpenEmails: () => void;
+  onLogout: () => void;
   users: User[];
 }
 
@@ -32,6 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSwitchUser,
   onResetDb,
   onOpenEmails,
+  onLogout,
   users,
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -42,7 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="bg-gradient-to-r from-blue-900/80 via-indigo-900/80 to-slate-900 px-4 py-1 text-xs text-blue-200 flex items-center justify-between border-b border-blue-800/40">
         <div className="flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="font-semibold text-white">LeadTracker OS</span>
+          <span className="font-semibold text-white">Sujal Das's LeadTracker</span>
           <span className="text-slate-400">|</span>
           <span>Lead Management Platform & API Suite</span>
         </div>
@@ -72,7 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   v1.0
                 </span>
               </div>
-              <p className="text-xs text-slate-400">LeadTracker OS</p>
+              <p className="text-xs text-slate-400">Sujal Das's LeadTracker</p>
             </div>
           </div>
 
@@ -205,8 +207,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ))}
                 </div>
 
-                <div className="pt-2 px-3 pb-1">
-                  <div className="text-[11px] text-slate-400">
+                <div className="pt-2 px-3 pb-1 border-t border-slate-800">
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      setShowUserDropdown(false);
+                    }}
+                    className="w-full text-left text-xs font-semibold text-rose-400 hover:text-rose-300 py-1"
+                  >
+                    Log Out
+                  </button>
+                  <div className="text-[11px] text-slate-400 mt-2">
                     <span className="text-amber-400 font-semibold">Note:</span> Admins can delete leads & run full administrative actions. Members are restricted to assigned lead updates.
                   </div>
                 </div>

@@ -47,10 +47,16 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<ApiRe
 }
 
 export const api = {
-  login: (email?: string, role?: 'admin' | 'member') =>
+  login: (email?: string, password?: string) =>
     request<{ token: string; user: User }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, role }),
+      body: JSON.stringify({ email, password }),
+    }),
+
+  register: (name: string, email: string, password: string) =>
+    request<{ token: string; user: User }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password }),
     }),
 
   getMe: () => request<User>('/api/auth/me'),
@@ -106,6 +112,11 @@ export const api = {
 
   resetDatabase: () =>
     request<{ message: string }>('/api/admin/reset', {
+      method: 'POST',
+    }),
+
+  clearLeads: () =>
+    request<{ message: string }>('/api/admin/clear', {
       method: 'POST',
     }),
 

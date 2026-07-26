@@ -95,22 +95,24 @@ async function startServer() {
     });
   });
 
-  // Auth: Login / Select User
+  // Auth: Login
   app.post('/api/auth/login', (req, res) => {
-    const { email, role } = req.body;
-    let user: User | undefined;
-
-    if (email) {
-      user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'Email and password are required' }
+      });
     }
 
-    if (!user && role) {
-      user = db.users.find(u => u.role === role);
-    }
+    const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
-    if (!user) {
-      // Default to first admin if not specified
-      user = db.users[0];
+    if (!user || user.password !== password) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED', message: 'Invalid email or password' }
+      });
     }
 
     const token = `token_${user.id}`;
@@ -119,6 +121,48 @@ async function startServer() {
       data: {
         token,
         user,
+      },
+    });
+  });
+
+  // Auth: Register
+  app.post('/api/auth/register', (req, res) => {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'Name, email, and password are required' }
+      });
+    }
+
+    const existingUser = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'User with this email already exists' }
+      });
+    }
+
+    const newUser: User = {
+      id: `usr_${Date.now()}`,
+      name,
+      email,
+      password,
+      role: 'member', // Default role
+      avatar: '/avatars/naruto_avatar_1785045491039.jpg', // Default avatar
+      title: 'New Member',
+      active: true,
+    };
+
+    db.users.push(newUser);
+
+    const token = `token_${newUser.id}`;
+    return res.json({
+      success: true,
+      data: {
+        token,
+        user: newUser,
       },
     });
   });
@@ -327,7 +371,7 @@ async function startServer() {
 
   // Create Lead (Authenticated)
   app.post('/api/leads', requireAuth, (req: AuthRequest, res) => {
-    const { name, email, phone, company, service, budget, status, assignedToId } = req.body;
+    const { name, email, phone, company, service, budget, status, assignedToId, extraData } = req.body;
 
     if (!name || !email || !company || !service) {
       return res.status(400).json({
@@ -359,6 +403,7 @@ async function startServer() {
       notesCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      extraData: extraData || {}
     };
 
     db.leads.unshift(newLead);
@@ -571,33 +616,21 @@ async function startServer() {
     const conversionRate = totalLeads ? Math.round((wonLeads.length / totalLeads) * 100) : 0;
     const avgDealSize = totalLeads ? Math.round(totalPipelineValue / totalLeads) : 0;
 
-    const byStatus: Record<LeadStatus, { count: number; value: number }> = {
-      new: { count: 0, value: 0 },
-      contacted: { count: 0, value: 0 },
-      discovery: { count: 0, value: 0 },
-      proposal: { count: 0, value: 0 },
-      negotiation: { count: 0, value: 0 },
-      won: { count: 0, value: 0 },
-      lost: { count: 0, value: 0 },
-    };
-
-    const byService: Record<LeadService, { count: number; value: number }> = {
-      shopify_dev: { count: 0, value: 0 },
-      web_dev: { count: 0, value: 0 },
-      performance_marketing: { count: 0, value: 0 },
-      full_stack_build: { count: 0, value: 0 },
-      cro_audit: { count: 0, value: 0 },
-    };
+    const byStatus: Record<string, { count: number; value: number }> = {};
+    const byService: Record<string, { count: number; value: number }> = {};
 
     db.leads.forEach(l => {
-      if (byStatus[l.status]) {
-        byStatus[l.status].count++;
-        byStatus[l.status].value += l.budget;
+      if (!byStatus[l.status]) {
+        byStatus[l.status] = { count: 0, value: 0 };
       }
-      if (byService[l.service]) {
-        byService[l.service].count++;
-        byService[l.service].value += l.budget;
+      byStatus[l.status].count++;
+      byStatus[l.status].value += l.budget;
+
+      if (!byService[l.service]) {
+        byService[l.service] = { count: 0, value: 0 };
       }
+      byService[l.service].count++;
+      byService[l.service].value += l.budget;
     });
 
     const stats: PipelineStats = {
@@ -622,6 +655,15 @@ async function startServer() {
     return res.json({
       success: true,
       message: 'Database reset to initial pre-seeded state.',
+    });
+  });
+
+  // Clear All Leads Endpoint
+  app.post('/api/admin/clear', requireAuth, requireRole('admin'), (req, res) => {
+    db.clearAllLeads();
+    return res.json({
+      success: true,
+      message: 'All leads and related data have been deleted.',
     });
   });
 

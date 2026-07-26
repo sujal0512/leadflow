@@ -1,26 +1,14 @@
 export type Role = 'admin' | 'member';
 
-export type LeadStatus = 
-  | 'new'
-  | 'contacted'
-  | 'discovery'
-  | 'qualified'
-  | 'proposal'
-  | 'negotiation'
-  | 'won'
-  | 'lost';
+export type LeadStatus = string;
 
-export type LeadService = 
-  | 'shopify_dev'
-  | 'web_dev'
-  | 'performance_marketing'
-  | 'full_stack_build'
-  | 'cro_audit';
+export type LeadService = string;
 
 export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string;
   role: Role;
   avatar: string;
   title: string;
@@ -53,9 +41,9 @@ export interface Lead {
   email: string;
   phone: string;
   company: string;
-  service: LeadService;
+  service: string;
   budget: number;
-  status: LeadStatus;
+  status: string;
   assignedToId: string | null;
   assignedToName: string | null;
   score: number; // 0-100 calculated
@@ -63,6 +51,7 @@ export interface Lead {
   notesCount: number;
   createdAt: string;
   updatedAt: string;
+  [key: string]: any;
 }
 
 export interface PipelineStats {
@@ -71,8 +60,8 @@ export interface PipelineStats {
   wonValue: number;
   conversionRate: number;
   avgDealSize: number;
-  byStatus: Record<LeadStatus, { count: number; value: number }>;
-  byService: Record<LeadService, { count: number; value: number }>;
+  byStatus: Record<string, { count: number; value: number }>;
+  byService: Record<string, { count: number; value: number }>;
 }
 
 export interface ApiPaginationMeta {

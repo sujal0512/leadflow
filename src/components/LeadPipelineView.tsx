@@ -49,11 +49,46 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
   users,
   onSelectLead,
 }) => {
-  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('kanban');
+  const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<PipelineStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const dynamicStages = React.useMemo(() => {
+    const defaultStageIds = STAGES.map(s => s.id);
+    const existingStages = [...STAGES];
+    
+    if (stats?.byStatus) {
+      Object.keys(stats.byStatus).forEach(statusId => {
+        if (!defaultStageIds.includes(statusId)) {
+          existingStages.push({
+            id: statusId,
+            label: statusId.charAt(0).toUpperCase() + statusId.slice(1).replace(/_/g, ' '),
+            badgeColor: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+            barColor: 'bg-slate-500'
+          });
+        }
+      });
+    }
+    return existingStages;
+  }, [stats?.byStatus]);
+
+  const dynamicHeaders = React.useMemo(() => {
+    const headers = new Set<string>();
+    leads.forEach(lead => {
+      if (lead.extraData) {
+        Object.keys(lead.extraData).forEach(key => {
+          // ignore internal known ones if they got in
+          const kLower = key.toLowerCase();
+          if (!['name', 'email', 'company', 'phone', 'budget', 'status', 'service', 'id', 'score'].includes(kLower)) {
+            headers.add(key);
+          }
+        });
+      }
+    });
+    return Array.from(headers);
+  }, [leads]);
 
   // Filters & Pagination
   const [search, setSearch] = useState('');
@@ -232,37 +267,56 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
         return;
       }
 
-      // We expect simple headers or we just parse by position:
-      // Name, Email, Company, Phone, Service, Budget
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      await api.clearLeads();
+
+      const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const headersLower = rawHeaders.map(h => h.toLowerCase());
       
-      const nameIdx = headers.findIndex(h => h.includes('name'));
-      const emailIdx = headers.findIndex(h => h.includes('email'));
-      const companyIdx = headers.findIndex(h => h.includes('company'));
-      const phoneIdx = headers.findIndex(h => h.includes('phone'));
-      const budgetIdx = headers.findIndex(h => h.includes('budget'));
+      const nameIdx = headersLower.findIndex(h => h.includes('name'));
+      const emailIdx = headersLower.findIndex(h => h.includes('email'));
+      const companyIdx = headersLower.findIndex(h => h.includes('company'));
+      const phoneIdx = headersLower.findIndex(h => h.includes('phone'));
+      const budgetIdx = headersLower.findIndex(h => h.includes('budget') || h.includes('amount') || h.includes('value'));
+      const statusIdx = headersLower.findIndex(h => h.includes('status') || h.includes('stage'));
+      const serviceIdx = headersLower.findIndex(h => h.includes('service') || h.includes('product'));
       
       let importedCount = 0;
       for (let i = 1; i < lines.length; i++) {
-        // Very basic CSV parsing splitting by comma (ignoring quotes for simplicity in this basic demo)
-        const row = lines[i].split(',').map(col => col.trim().replace(/^"|"$/g, ''));
-        if (row.length < 2) continue;
+        // Handle CSV split carefully to not split inside quotes
+        // This is a naive regex-based splitter that handles basic quotes
+        let row: string[] = [];
+        let match;
+        const regex = /(".*?"|[^",\s]+)(?=\s*,|\s*$)/g;
+        let line = lines[i];
+        if(!line) continue;
+        
+        // Simpler split that ignores quotes for now to keep it fast and less error prone for complex strings
+        row = line.split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+        if (row.length === 0 || (row.length === 1 && !row[0])) continue;
+        
+        const extraData: Record<string, any> = {};
+        for(let c = 0; c < row.length; c++) {
+          if (c < rawHeaders.length) {
+            extraData[rawHeaders[c]] = row[c];
+          }
+        }
         
         const newLead = {
-          name: nameIdx !== -1 ? row[nameIdx] : `Lead ${i}`,
-          email: emailIdx !== -1 ? row[emailIdx] : `unknown${i}@example.com`,
-          company: companyIdx !== -1 ? row[companyIdx] : `Company ${i}`,
-          phone: phoneIdx !== -1 ? row[phoneIdx] : '',
-          service: 'web_dev' as any,
-          budget: budgetIdx !== -1 ? parseInt(row[budgetIdx], 10) || 5000 : 5000,
-          status: 'new' as any,
+          name: nameIdx !== -1 && row[nameIdx] ? row[nameIdx] : (companyIdx !== -1 && row[companyIdx] ? `Contact at ${row[companyIdx]}` : `Lead ${i}`),
+          email: emailIdx !== -1 && row[emailIdx] ? row[emailIdx] : `unknown${i}@example.com`,
+          company: companyIdx !== -1 && row[companyIdx] ? row[companyIdx] : `Company ${i}`,
+          phone: phoneIdx !== -1 && row[phoneIdx] ? row[phoneIdx] : '',
+          service: serviceIdx !== -1 && row[serviceIdx] ? row[serviceIdx] : 'general',
+          budget: budgetIdx !== -1 && row[budgetIdx] ? (parseInt(row[budgetIdx].replace(/[^0-9]/g, ''), 10) || 5000) : 5000,
+          status: statusIdx !== -1 && row[statusIdx] ? row[statusIdx].toLowerCase().replace(/[^a-z0-9_]/g, '_') : 'new',
+          extraData
         };
         
         await api.createLead(newLead);
         importedCount++;
       }
       
-      alert(`Successfully imported ${importedCount} leads!`);
+      alert(`Successfully imported ${importedCount} records!`);
       fetchData();
     } catch (err) {
       console.error(err);
@@ -270,6 +324,23 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
     } finally {
       setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleClearData = async () => {
+    if (!window.confirm('Are you sure you want to delete all leads? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await api.clearLeads();
+      alert('All leads have been deleted.');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to clear leads.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -285,7 +356,7 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
     return '#3b82f6';
   };
 
-  const chartData = STAGES.map(s => ({
+  const chartData = dynamicStages.map(s => ({
     name: s.label,
     count: stats?.byStatus?.[s.id]?.count || 0,
     color: getHexColor(s.barColor),
@@ -429,6 +500,16 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
             </button>
 
             <button
+              onClick={handleClearData}
+              disabled={loading}
+              className="flex items-center gap-1.5 bg-red-900/30 hover:bg-red-800/40 text-red-400 text-xs font-semibold px-4 py-2 rounded-xl border border-red-800/50 transition"
+              title="Delete all data"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Clear Data</span>
+            </button>
+
+            <button
               onClick={() => setShowNewModal(true)}
               className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition shadow-lg shadow-blue-600/20"
             >
@@ -450,7 +531,7 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
               className="w-full bg-slate-950 border border-slate-800 text-white rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">All Statuses</option>
-              {STAGES.map(s => (
+              {dynamicStages.map(s => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
@@ -528,7 +609,7 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
       {/* VIEW 1: KANBAN BOARD */}
       {viewMode === 'kanban' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
-          {STAGES.map(stage => {
+          {dynamicStages.map(stage => {
             const stageLeads = leads.filter(l => l.status === stage.id);
             const stageTotalVal = stageLeads.reduce((acc, curr) => acc + curr.budget, 0);
 
@@ -604,9 +685,9 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
                             {stage.id !== 'won' && stage.id !== 'lost' && (
                               <button
                                 onClick={() => {
-                                  const stageIdx = STAGES.findIndex(s => s.id === stage.id);
-                                  if (stageIdx < STAGES.length - 1) {
-                                    handleStageAdvance(lead.id, stage.id, STAGES[stageIdx + 1].id);
+                                  const stageIdx = dynamicStages.findIndex(s => s.id === stage.id);
+                                  if (stageIdx < dynamicStages.length - 1) {
+                                    handleStageAdvance(lead.id, stage.id, dynamicStages[stageIdx + 1].id);
                                   }
                                 }}
                                 className="text-[10px] bg-blue-600/30 hover:bg-blue-600 text-blue-200 px-1.5 py-0.5 rounded border border-blue-500/40 transition"
@@ -638,13 +719,16 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
                   <th className="p-3.5">Budget</th>
                   <th className="p-3.5">Lead Score</th>
                   <th className="p-3.5">Assigned Owner</th>
+                  {dynamicHeaders.map(header => (
+                    <th key={header} className="p-3.5 whitespace-nowrap">{header}</th>
+                  ))}
                   <th className="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
                 {leads.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-12 text-slate-500">
+                    <td colSpan={7 + dynamicHeaders.length} className="text-center py-12 text-slate-500">
                       No matching leads found. Try relaxing search filters.
                     </td>
                   </tr>
@@ -665,10 +749,10 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
                       <td className="p-3.5">
                         <span
                           className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
-                            STAGES.find(s => s.id === lead.status)?.badgeColor || 'bg-slate-800'
+                            dynamicStages.find(s => s.id === lead.status)?.badgeColor || 'bg-slate-800'
                           }`}
                         >
-                          {STAGES.find(s => s.id === lead.status)?.label || lead.status}
+                          {dynamicStages.find(s => s.id === lead.status)?.label || lead.status}
                         </span>
                       </td>
 
@@ -699,6 +783,12 @@ export const LeadPipelineView: React.FC<LeadPipelineViewProps> = ({
                           {lead.assignedToName || 'Unassigned'}
                         </span>
                       </td>
+
+                      {dynamicHeaders.map(header => (
+                        <td key={header} className="p-3.5 text-slate-400">
+                          {lead.extraData?.[header] || '-'}
+                        </td>
+                      ))}
 
                       <td className="p-3.5 text-right space-x-2" onClick={e => e.stopPropagation()}>
                         <button

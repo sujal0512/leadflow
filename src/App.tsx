@@ -6,7 +6,8 @@ import { LeadDetailDrawer } from './components/LeadDetailDrawer';
 import { PublicLeadCaptureForm } from './components/PublicLeadCaptureForm';
 import { ApiExplorerView } from './components/ApiExplorerView';
 import { EmailNotificationsPanel } from './components/EmailNotificationsPanel';
-import { api, setAuthToken } from './lib/apiClient';
+import { AuthPage } from './components/AuthPage';
+import { api, setAuthToken, getAuthToken } from './lib/apiClient';
 import { User } from './types';
 
 export default function App() {
@@ -16,23 +17,30 @@ export default function App() {
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [showEmails, setShowEmails] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     initAuth();
   }, []);
 
   const initAuth = async () => {
-    // Login default admin Priya Sharma
-    const loginRes = await api.login(undefined, 'admin');
-    if (loginRes.success && loginRes.data) {
-      setAuthToken(loginRes.data.token);
-      setCurrentUser(loginRes.data.user);
+    setIsInitializing(true);
+    const token = getAuthToken();
+    if (token) {
+      const res = await api.getMe();
+      if (res.success && res.data) {
+        setCurrentUser(res.data);
+      } else {
+        // invalid token
+        setAuthToken('');
+      }
     }
 
     const usersRes = await api.getUsers();
     if (usersRes.success && usersRes.data) {
       setUsers(usersRes.data);
     }
+    setIsInitializing(false);
   };
 
   const handleSwitchUser = async (role: 'admin' | 'member', userId?: string) => {
@@ -42,11 +50,15 @@ export default function App() {
     }
 
     if (targetUser) {
-      const loginRes = await api.login(targetUser.email);
+      // For demo switch, just use password123 as we seeded it, or we can just bypass if we really wanted to, 
+      // but let's clear session and require login for a realistic flow, or auto-login with default pass.
+      const loginRes = await api.login(targetUser.email, 'password123');
       if (loginRes.success && loginRes.data) {
         setAuthToken(loginRes.data.token);
         setCurrentUser(loginRes.data.user);
         setRefreshTrigger(prev => prev + 1);
+      } else {
+        alert('Could not switch to user: ' + (loginRes.error?.message || 'Invalid credentials'));
       }
     }
   };
@@ -59,6 +71,30 @@ export default function App() {
     }
   };
 
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-blue-500 font-semibold animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  // Public form doesn't strictly need auth, but for simplicity we keep the main shell authenticated
+  // Or we can allow public form to bypass AuthPage
+  if (!currentUser && activeTab !== 'public_form') {
+    return (
+      <AuthPage 
+        onLogin={(user) => {
+          setCurrentUser(user);
+          // fetch users list again after login to make sure it's up to date
+          api.getUsers().then(res => {
+            if (res.success && res.data) setUsers(res.data);
+          });
+        }} 
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-blue-500 selection:text-white">
       {/* Navigation Header */}
@@ -69,6 +105,10 @@ export default function App() {
         onSwitchUser={handleSwitchUser}
         onResetDb={handleResetDb}
         onOpenEmails={() => setShowEmails(true)}
+        onLogout={() => {
+          setAuthToken('');
+          setCurrentUser(null);
+        }}
         users={users}
       />
 

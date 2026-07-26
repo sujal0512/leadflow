@@ -5,9 +5,10 @@ export const INITIAL_USERS: User[] = [
   {
     id: 'usr_admin_1',
     name: 'Sujal Das',
-    email: 'Sujal.das8797@gmail.com',
+    email: 'sujal.das8797@gmail.com',
+    password: 'password123',
     role: 'admin',
-    avatar: 'https://kommodo.ai/i/39Vh61G4xzFg3t1OpWed',
+    avatar: '/avatars/naruto_avatar_1785045491039.jpg',
     title: 'Head of Sales & Growth',
     active: true,
   },
@@ -15,8 +16,9 @@ export const INITIAL_USERS: User[] = [
     id: 'usr_member_1',
     name: 'Rahul Patel',
     email: 'rahul@leadtracker.app',
+    password: 'password123',
     role: 'member',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    avatar: '/avatars/sasuke_avatar_1785045504807.jpg',
     title: 'Senior Account Executive',
     active: true,
   },
@@ -24,8 +26,9 @@ export const INITIAL_USERS: User[] = [
     id: 'usr_member_2',
     name: 'Ananya Singh',
     email: 'ananya@leadtracker.app',
+    password: 'password123',
     role: 'member',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    avatar: '/avatars/sakura_avatar_1785045519263.jpg',
     title: 'Technical Sales Specialist',
     active: true,
   },
@@ -33,8 +36,9 @@ export const INITIAL_USERS: User[] = [
     id: 'usr_member_3',
     name: 'Vikram Gupta',
     email: 'vikram@leadtracker.app',
+    password: 'password123',
     role: 'member',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150',
+    avatar: '/avatars/kakashi_avatar_1785045533691.jpg',
     title: 'Business Development Rep',
     active: true,
   },
@@ -153,7 +157,7 @@ export const INITIAL_LEADS: Lead[] = [
     budget: 85000,
     status: 'won',
     assignedToId: 'usr_admin_1',
-    assignedToName: 'Priya Sharma',
+    assignedToName: 'Sujal Das',
     score: 98,
     source: 'Referral',
     notesCount: 4,
@@ -306,7 +310,7 @@ export const INITIAL_LEADS: Lead[] = [
     budget: 90000,
     status: 'won',
     assignedToId: 'usr_admin_1',
-    assignedToName: 'Priya Sharma',
+    assignedToName: 'Sujal Das',
     score: 99,
     source: 'Referral',
     notesCount: 5,
@@ -442,7 +446,7 @@ export const INITIAL_LEADS: Lead[] = [
     budget: 200000,
     status: 'qualified',
     assignedToId: 'usr_admin_1',
-    assignedToName: 'Priya Sharma',
+    assignedToName: 'Sujal Das',
     score: 99,
     source: 'Inbound Contact',
     notesCount: 3,
@@ -575,7 +579,7 @@ export const INITIAL_NOTES: LeadNote[] = [
     id: 'note_1',
     leadId: 'lead_101',
     authorId: 'usr_admin_1',
-    authorName: 'Priya Sharma',
+    authorName: 'Sujal Das',
     authorRole: 'admin',
     content: 'Initial discovery call completed. Rohan wants custom Shopify Plus theme rebuild with subscriptions integration.',
     createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
@@ -605,7 +609,7 @@ export const INITIAL_ACTIVITIES: LeadActivity[] = [
     id: 'act_1',
     leadId: 'lead_101',
     userId: 'usr_admin_1',
-    userName: 'Priya Sharma',
+    userName: 'Sujal Das',
     action: 'Lead Captured',
     details: 'Submitted public lead capture form for Shopify Development (₹45,000 budget)',
     timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -614,7 +618,7 @@ export const INITIAL_ACTIVITIES: LeadActivity[] = [
     id: 'act_2',
     leadId: 'lead_101',
     userId: 'usr_admin_1',
-    userName: 'Priya Sharma',
+    userName: 'Sujal Das',
     action: 'Assigned Lead',
     details: 'Assigned lead to Rahul Patel (Senior Account Executive)',
     timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
@@ -643,6 +647,13 @@ class DataStore {
     this.leads = JSON.parse(JSON.stringify(INITIAL_LEADS));
     this.notes = JSON.parse(JSON.stringify(INITIAL_NOTES));
     this.activities = JSON.parse(JSON.stringify(INITIAL_ACTIVITIES));
+    this.emails = [];
+  }
+
+  clearAllLeads() {
+    this.leads = [];
+    this.notes = [];
+    this.activities = [];
     this.emails = [];
   }
 
